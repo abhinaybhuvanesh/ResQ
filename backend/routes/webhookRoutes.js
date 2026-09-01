@@ -16,7 +16,7 @@ router.post('/razorpay', async (req, res) => {
       .digest('hex');
 
     if (signature !== expectedSignature) {
-      console.error('❌ Invalid webhook signature');
+      console.error(' Invalid webhook signature');
       return res.status(401).send('Invalid signature');
     }
 
@@ -46,7 +46,7 @@ router.post('/razorpay', async (req, res) => {
     }
 
     if (!order) {
-      console.error(`❌ Order not found for Razorpay order: ${razorpayOrderId}`);
+      console.error(` Order not found for Razorpay order: ${razorpayOrderId}`);
       return res.status(404).send('Order not found');
     }
 
@@ -78,7 +78,7 @@ router.post('/razorpay', async (req, res) => {
         metadata: { paymentId, status: order.status }
       });
 
-      console.log(`✅ Order ${order._id} marked as ${order.status}`);
+      console.log(` Order ${order._id} marked as ${order.status}`);
     } else if (eventType === 'payment.failed') {
       if (order.status === 'PENDING' || order.status === 'RECOVERY_ACTIVE') {
         const recoveryWindowMs = 10 * 60 * 1000;
@@ -104,7 +104,7 @@ router.post('/razorpay', async (req, res) => {
     await WebhookEvent.findOneAndUpdate({ eventId }, { processed: true });
     res.status(200).send('Webhook processed successfully');
   } catch (error) {
-    console.error('❌ Webhook Error:', error);
+    console.error(' Webhook Error:', error);
     res.status(500).send('Internal server error');
   }
 });
