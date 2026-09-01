@@ -11,8 +11,8 @@ const PORT = process.env.PORT || 5001;
 mongoose.connect(process.env.MONGODB_URI, {
   dbName: "resq"
 })
-  .then(() => console.log('✅ ResQ: MongoDB Connected'))
-  .catch((err) => console.error('❌ ResQ: MongoDB Error:', err.message));
+  .then(() => console.log(' ResQ: MongoDB Connected'))
+  .catch((err) => console.error(' ResQ: MongoDB Error:', err.message));
 
 app.use('/api/webhooks', express.raw({ type: 'application/json' }));
 app.use(cors());

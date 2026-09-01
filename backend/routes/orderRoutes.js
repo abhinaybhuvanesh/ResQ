@@ -4,7 +4,6 @@ const Order = require('../models/Order');
 const AuditTrail = require('../models/AuditTrail');
 const MerchantConfig = require('../models/MerchantConfig');
 
-// CREATE ORDER
 router.post('/create', async (req, res) => {
   try {
     const { amount, productName, productDescription, merchantId } = req.body;
@@ -46,7 +45,6 @@ router.post('/create', async (req, res) => {
   }
 });
 
-// GET ALL ORDERS (for Dashboard)
 router.get('/', async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
@@ -57,7 +55,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET SINGLE ORDER (for polling)
 router.get('/:id', async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -69,7 +66,6 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// CREATE RAZORPAY PAYMENT LINK
 router.post('/create-payment-link', async (req, res) => {
   try {
     const { orderId, amount, productName } = req.body;
