@@ -1,66 +1,28 @@
-# 🛡️ ResQ
+# ResQ
 
-### Commerce Continuity Engine for Failed Payments
+## Commerce Continuity Engine for Failed Payments
 
-ResQ is a payment recovery system built for the **Razorpay AI Builder Internship 2026 — AI Revenue Recovery track**.
+ResQ is a payment recovery system built for the Razorpay AI Builder Internship 2026, AI Revenue Recovery track.
 
 A failed payment should not automatically mean a lost purchase.
 
-Instead of ending the checkout after one unsuccessful payment attempt, ResQ keeps the purchase alive for a controlled recovery window, tracks the same order through the recovery journey, allows the customer to retry the payment, and only considers the purchase completed after Razorpay confirms the payment.
+Instead of ending the checkout after one unsuccessful payment attempt, ResQ keeps the purchase alive for a controlled recovery window, allows the customer to retry, and updates the purchase only after Razorpay confirms the payment.
 
-> **Recover the purchase journey, not just the failed transaction.**
-
----
-
-## 📌 The Problem
-
-A customer may genuinely want to complete a purchase but still face a payment failure because of banking issues, network problems, timeouts, or other temporary failures.
-
-In a normal checkout flow, that single failure can interrupt the purchase and increase the chance of the customer dropping off.
-
-ResQ treats the **purchase journey** as the unit of recovery instead of treating every payment attempt as a separate transaction.
+> Recover the purchase journey, not just the failed transaction.
 
 ---
 
-## ⚙️ What ResQ Does
+## The Problem
 
-When a customer starts a purchase:
+A customer may still want to complete a purchase even when a payment fails because of a temporary banking issue, timeout, network problem, or unsuccessful payment attempt.
 
-1. ResQ creates and tracks the order.
-2. The customer continues to Razorpay Test Mode for payment.
-3. Razorpay sends payment events to the ResQ backend through webhooks.
-4. If the payment succeeds, the order moves to `PAID`.
-5. If the payment fails, the same order moves to `RECOVERY_ACTIVE`.
-6. A controlled recovery window begins.
-7. The customer can retry the payment while the purchase remains active.
-8. When Razorpay confirms the successful retry, the same order moves to `PAID`.
-9. MongoDB stores the latest state and the merchant dashboard reflects the updated order.
+In a normal checkout flow, that single failure can interrupt the purchase and increase customer drop-off.
 
-The recovery flow depends on **verified backend payment events**, rather than only on what the frontend displays.
+ResQ treats the purchase journey as the unit of recovery instead of treating every payment attempt as an isolated transaction.
 
 ---
 
-## 🔄 Recovery Flow
-
-### Normal Successful Payment
-
-```text
-Customer Checkout
-        ↓
-Order Created
-        ↓
-Razorpay Payment
-        ↓
-payment.captured
-        ↓
-PAID
-        ↓
-MongoDB Updated
-        ↓
-Merchant Dashboard Updated
-```
-
-### Failed Payment → Recovery
+## How ResQ Works
 
 ```text
 Customer Checkout
@@ -73,51 +35,52 @@ payment.failed
         ↓
 RECOVERY_ACTIVE
         ↓
-Recovery Window Starts
+Recovery Window
         ↓
-Customer Retries Payment
+Customer Retries
         ↓
 payment.captured
         ↓
 PAID
         ↓
-Purchase Recovered
+MongoDB + Merchant Dashboard Updated
 ```
 
----
+If the first payment succeeds, the order moves directly from `PENDING` to `PAID`.
 
-## 🧠 Core Principles
+If it fails, the same order enters `RECOVERY_ACTIVE` instead of being immediately discarded. The customer gets a controlled period to retry the payment.
 
-ResQ is designed around three main ideas:
-
-- **Payment truth comes from Razorpay**
-- **Recovery is controlled by backend order state**
-- **Important recovery events remain traceable**
-
-A frontend success or failure screen alone is not treated as the final payment truth.
+The final payment state is based on Razorpay events processed by the backend, not only on what the browser displays.
 
 ---
 
-## ✨ Features
+## Core Principles
+
+- Payment truth comes from Razorpay
+- Recovery is controlled by backend order state
+- Duplicate payment events should not create duplicate updates
+- Important recovery transitions remain traceable
+
+---
+
+## Key Features
 
 - Razorpay Test Mode integration
-- Failed-payment detection through webhooks
-- Controlled recovery window
+- Failed-payment recovery flow
+- Controlled recovery countdown
 - Same-order payment retry
-- `RECOVERY_ACTIVE` recovery state
-- Razorpay webhook signature verification
+- Razorpay webhook processing
+- HMAC webhook signature verification
 - Duplicate webhook event protection
 - MongoDB order persistence
-- Payment ID storage
-- Audit trail for important order events
+- Recovery audit trail
 - Merchant recovery dashboard
-- Backend-driven payment state
-- Late payment state support
-- Responsive customer checkout flow
+- Payment ID persistence
+- Late-payment state support
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -130,64 +93,61 @@ A frontend success or failure screen alone is not treated as the final payment t
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```text
-                    Customer
-                       │
-                       ▼
-               ┌───────────────┐
-               │ React + Vite  │
-               │   Frontend    │
-               └───────┬───────┘
-                       │
-                    REST API
-                       │
-                       ▼
-               ┌───────────────┐
-               │ Node.js +     │
-               │ Express       │
-               │ Backend       │
-               └───────┬───────┘
-                       │
-            ┌──────────┴──────────┐
-            │                     │
-            ▼                     ▼
-     ┌──────────────┐      ┌──────────────┐
-     │ MongoDB      │      │ Razorpay     │
-     │ Atlas        │      │ Test Mode    │
-     └──────────────┘      └──────┬───────┘
-                                  │
-                               Webhook
-                                  │
-                                  ▼
-                           ResQ Backend
-                                  │
-                           Order State Update
+                       Customer
+                          |
+                          v
+                 +-----------------+
+                 | React + Vite    |
+                 | Frontend        |
+                 +--------+--------+
+                          |
+                       REST API
+                          |
+                          v
+                 +-----------------+
+                 | Node + Express  |
+                 | Backend         |
+                 +--------+--------+
+                          |
+                +---------+---------+
+                |                   |
+                v                   v
+         +-------------+      +-------------+
+         | MongoDB     |      | Razorpay    |
+         | Atlas       |      | Test Mode   |
+         +-------------+      +------+------+
+                                     |
+                                  Webhook
+                                     |
+                                     v
+                              ResQ Backend
+                                     |
+                              Order State Update
 ```
 
 ---
 
-## 📦 Order States
+## Order States
 
-| Status | Description |
+| Status | Meaning |
 |---|---|
 | `PENDING` | Order created and waiting for payment |
 | `RECOVERY_ACTIVE` | Payment failed and recovery window is active |
-| `DORMANT` | Active recovery has stopped but the order can remain available for later handling |
+| `DORMANT` | Active recovery has stopped |
 | `PAID` | Razorpay confirmed the payment |
 | `EXPIRED` | Recovery window ended without successful payment |
 | `PAID_AFTER_TIMEOUT` | Payment was confirmed after the expected recovery window |
 
-A failed payment is treated as a **payment event**, rather than permanently marking the complete order as failed.
+A failed payment is treated as a payment event, not as the permanent final state of the purchase.
 
 ---
 
-## 🔐 Webhook Reliability
+## Webhook Reliability
 
-Payment recovery should not depend only on the browser.
-
-ResQ processes Razorpay payment events on the backend and applies several checks before changing the order state.
+Payment recovery cannot depend only on frontend state.
 
 ### Signature Verification
 
@@ -195,78 +155,88 @@ Incoming Razorpay webhook requests are verified using HMAC-SHA256 before their p
 
 ### Duplicate Event Protection
 
-Processed events are stored in the `WebhookEvent` collection.
-
-This prevents the same webhook event from repeatedly changing the order state.
+Processed webhook events are stored in a `WebhookEvent` collection so repeated events do not update the same order multiple times.
 
 ### State Checks
 
-The current order status is checked before important state transitions are applied.
+The current order state is checked before applying important transitions.
 
-This helps prevent repeated or delayed events from incorrectly changing the recovery journey.
+```text
+PENDING
+   |
+payment.failed
+   |
+   v
+RECOVERY_ACTIVE
+   |
+payment.captured
+   |
+   v
+PAID
+```
 
----
-
-## 🗄️ Database Models
-
-### `Order`
-
-Stores the purchase and recovery state, including:
-
-- Product name
-- Product description
-- Amount
-- Merchant
-- Order status
-- Reserved stock
-- Locked discount
-- Recovery expiry time
-- Payment ID
-- Recovery information
-
-### `WebhookEvent`
-
-Stores processed payment events and supports duplicate-event protection.
-
-### `AuditTrail`
-
-Records important events during the order and recovery lifecycle.
-
-### `MerchantConfig`
-
-Stores merchant-level recovery configuration and policy limits.
+This allows the backend and persisted database state to remain the source of truth for the recovery journey.
 
 ---
 
-## 📊 Merchant Dashboard
+## Main Database Models
 
-The dashboard provides visibility into the current order and recovery states.
+### Order
 
-It displays information such as:
+Stores:
 
-- Total revenue
-- Paid orders
-- Active recoveries
-- Dormant orders
-- Order status
-- Order amount
-- Recovery activity
+- product information
+- amount
+- merchant
+- order status
+- recovery expiry
+- stock reservation
+- locked discount
+- payment ID
 
-Dashboard information is fetched from backend order data stored in MongoDB.
+### WebhookEvent
+
+Stores processed Razorpay events for duplicate-event protection.
+
+### AuditTrail
+
+Records important events throughout the order lifecycle.
+
+### MerchantConfig
+
+Stores merchant-level recovery configuration and limits.
 
 ---
 
-## 🔌 API Endpoints
+## Merchant Dashboard
+
+The dashboard gives the merchant visibility into the current payment and recovery state.
+
+It shows:
+
+- orders
+- paid orders
+- active recoveries
+- dormant orders
+- order amounts
+- payment status
+- recovery activity
+
+The dashboard reads order information from the backend and MongoDB.
+
+---
+
+## API Endpoints
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| `POST` | `/api/orders/create` | Create a new order |
-| `GET` | `/api/orders` | Fetch orders for the merchant dashboard |
-| `GET` | `/api/orders/:id` | Fetch the latest state of one order |
-| `POST` | `/api/orders/create-payment-link` | Create a Razorpay Test Mode payment link |
-| `POST` | `/api/webhooks` | Receive and process Razorpay webhook events |
+| `POST` | `/api/orders/create` | Create an order |
+| `GET` | `/api/orders` | Fetch orders |
+| `GET` | `/api/orders/:id` | Fetch the latest state of an order |
+| `POST` | `/api/orders/create-payment-link` | Create a Razorpay payment link |
+| `POST` | `/api/webhooks` | Process Razorpay webhook events |
 
-Important Razorpay events handled by the recovery flow include:
+Important payment events handled:
 
 ```text
 payment.failed
@@ -275,76 +245,23 @@ payment.captured
 
 ---
 
-## 🧪 Testing the Recovery Flow
+## Run Locally
 
-The complete recovery journey can be tested using Razorpay Test Mode.
-
-1. Open the ResQ store.
-2. Select a product.
-3. Click **Buy Now**.
-4. Continue to checkout.
-5. Click **Pay Now**.
-6. Complete a Razorpay Test Mode payment.
-
-For the recovery flow:
-
-1. Simulate a failed payment in Razorpay Test Mode.
-2. Return to ResQ.
-3. The same order moves to:
-
-```text
-RECOVERY_ACTIVE
-```
-
-4. A recovery countdown begins.
-5. Continue the payment again.
-6. Complete the retry successfully in Razorpay Test Mode.
-7. Razorpay sends the successful payment event.
-8. The same order moves to:
-
-```text
-PAID
-```
-
-9. The final state can be verified in:
-   - ResQ checkout
-   - Backend logs
-   - MongoDB
-   - Merchant dashboard
-
----
-
-## 🚀 Local Setup
-
-### Prerequisites
-
-Make sure you have:
-
-- Node.js
-- npm
-- MongoDB Atlas account
-- Razorpay Test Mode account
-- ngrok
-
----
-
-### 1. Clone the Repository
+### Clone
 
 ```bash
 git clone https://github.com/abhinaybhuvanesh/ResQ.git
 cd ResQ
 ```
 
----
-
-### 2. Backend Setup
+### Backend
 
 ```bash
 cd backend
 npm install
 ```
 
-Create a `.env` file inside the `backend` directory:
+Create `backend/.env`:
 
 ```env
 PORT=5001
@@ -360,17 +277,7 @@ Start the backend:
 npm start
 ```
 
-The backend runs on:
-
-```text
-http://localhost:5001
-```
-
----
-
-### 3. Frontend Setup
-
-Open another terminal:
+### Frontend
 
 ```bash
 cd frontend
@@ -378,37 +285,35 @@ npm install
 npm run dev
 ```
 
-The frontend runs on:
+Frontend:
 
 ```text
 http://localhost:5173
 ```
 
----
+Backend:
 
-### 4. Start ngrok
+```text
+http://localhost:5001
+```
 
-Razorpay needs a public URL to send webhook events to your locally running backend.
+### Webhook Testing
 
 ```bash
 ngrok http 5001
 ```
 
-Copy the HTTPS forwarding URL generated by ngrok.
-
-Configure the Razorpay webhook endpoint as:
+Configure the Razorpay webhook URL as:
 
 ```text
 https://YOUR-NGROK-URL/api/webhooks
 ```
 
-Use the same webhook secret in Razorpay and your backend `.env` file.
-
 ---
 
-## 🔒 Security
+## Security
 
-Sensitive configuration is stored using environment variables.
+Sensitive credentials are stored using environment variables and excluded from Git using `.gitignore`.
 
 The repository should never contain:
 
@@ -417,76 +322,48 @@ The repository should never contain:
 - Razorpay Webhook Secrets
 - `.env` files
 
-The `.env` file is excluded from version control using `.gitignore`.
-
-Razorpay webhook signatures are also verified before payment events are processed.
+Razorpay webhook signatures are verified before payment events are processed.
 
 ---
 
-## 💡 Key Engineering Learning
+## Key Engineering Learning
 
-The biggest learning while building ResQ was making payment recovery depend on **verified backend state instead of only what the frontend displayed**.
+The biggest learning while building ResQ was making the recovery flow depend on verified backend state instead of only what the frontend displayed.
 
-The browser can refresh, close, lose connectivity, or temporarily display an outdated state.
-
-Because of that, Razorpay payment events, backend validation, and persisted MongoDB data act as the source of truth for the recovery journey.
+The browser can refresh, close, lose connectivity, or temporarily display an outdated state. Razorpay payment events, backend validation, and persisted MongoDB state therefore act as the source of truth for the recovery journey.
 
 ---
 
-## 📍 Current Scope
+## Next Step
 
-ResQ is currently a working prototype using **Razorpay Test Mode**.
-
-The current version demonstrates:
-
-- Order creation
-- Razorpay payment initiation
-- Payment failure detection
-- Recovery activation
-- Recovery countdown
-- Payment retry
-- Webhook processing
-- MongoDB persistence
-- Successful recovery
-- Merchant dashboard visibility
-
-Future versions can extend the recovery engine with:
-
-- Failure-specific recovery strategies
-- Dynamic recovery windows
-- Merchant-defined recovery policies
-- Payment-method recommendations
-- Customer consent-based dormant recovery
-- AI-assisted recovery decisions and explanations
+The recovery engine can be extended with dynamic recovery windows, failure-specific payment strategies, merchant policies, and AI-assisted recovery recommendations.
 
 ---
 
-## 🎯 Built For
+## Built For
 
-**Razorpay AI Builder Internship 2026**  
-**Track: AI Revenue Recovery**
+Razorpay AI Builder Internship 2026  
+Track: AI Revenue Recovery
 
 ---
 
-## 👨‍💻 Author
+## Author
 
-**Abhinay Bhuvanesh Thota**
-
-B.Tech Computer Science & Engineering  
+Abhinay Bhuvanesh Thota  
+B.Tech Computer Science and Engineering  
 KL University, Hyderabad
 
-GitHub: [abhinaybhuvanesh](https://github.com/abhinaybhuvanesh)
-
-LinkedIn: [abhinaybhuvanesh](https://linkedin.com/in/abhinaybhuvanesh)
+GitHub: https://github.com/abhinaybhuvanesh  
+LinkedIn: https://linkedin.com/in/abhinaybhuvanesh
 
 ---
 
-## ⚠️ Disclaimer
+## Disclaimer
 
-ResQ uses **Razorpay Test Mode** for development and demonstration.
+ResQ uses Razorpay Test Mode for development and demonstration.
 
 No real payments are processed as part of the project demo.
 
 ---
 
-### 🛡️ ResQ — Keep the purchase alive.
+ResQ — Keep the purchase alive.
