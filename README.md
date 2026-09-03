@@ -1,61 +1,72 @@
-Project Name: ResQ
-Tagline: Keep the purchase alive.
+# ResQ
 
-ResQ is an AI-powered commerce continuity engine that recovers revenue from failed payments. Instead of showing a dead "Payment Failed" screen, ResQ temporarily protects the order, stock, and price, intelligently diagnoses the failure, and guides the customer to a successful retry—all while providing a verifiable audit trail for merchants.
+### Commerce Continuity Engine for Failed Payments
 
-Built for the Razorpay AI Buildathon — "Code speaks louder than resumes."
+ResQ is a payment recovery system built for the **Razorpay AI Builder Internship 2026 — AI Revenue Recovery track**.
 
-The Problem It Solves:
-When a UPI or card payment fails, customers abandon carts, merchants lose revenue, and support teams get flooded with queries. ResQ ensures that a failed transaction doesn't mean a lost sale.
+A failed payment should not automatically mean a lost purchase.
 
-Key Features:
-- Commerce Continuity Window — Temporarily reserves stock and price when a payment fails.
-- Dynamic Recovery Timer — Holds the order for 3–15 minutes based on inventory demand.
-- 3-Way Failure Classification — Distinguishes Wrong PIN (retry UPI), Bank Outage (switch payment method), and Unknown errors.
-- Self-Healing Checkout — Dynamically adapts the payment UI based on the real failure reason.
-- Dormant Order Recovery — If the timer expires, the order goes dormant; if the payment route heals later, the customer gets a consent-based second chance.
-- Verified Revenue Metrics — Only counts ₹ as "recovered" if Razorpay confirms payment.captured via webhook.
-- Audit Trail — Full transaction history showing every state transition.
-- Webhook Security — Signature verification and deduplication to prevent double processing.
+ResQ keeps the purchase alive for a controlled recovery window, tracks the order throughout the payment journey, allows the customer to retry the payment, and only treats the purchase as recovered after Razorpay confirms the successful payment.
 
-Tech Stack:
-Frontend: React.js, Vite, CSS
-Backend: Node.js, Express.js
-Database: MongoDB, Mongoose
-Payments: Razorpay API (Test Mode)
-State Management: React Hooks
-Deployment: Render (Backend), Vercel (Frontend)
+---
 
-Architecture Flow:
-Order Created → Stock/Price Reserved → Payment Attempt → Payment Fails → Truth Guard (Check if money actually left) → Classify Failure (Wrong PIN vs Bank Outage) → Incentive Check (Optional merchant-controlled recovery credit) → Dynamic Recovery Window (3-15 mins) → Success = PAID ✅ / Timeout = Release Stock → Dormant Order (24hrs) → Route becomes healthy → Customer Consent (Tap to Pay) → PAID ✅ → Audit Trail & Verified Revenue
+## The Problem
 
-How to Test the Recovery Flow:
-1. Buy a product from the ResQ Store.
-2. On the Razorpay checkout page, enter the wrong OTP (0000).
-3. The payment will fail — and ResQ will automatically display the "Recovery Active" screen with a 10-minute timer.
-4. Click "Continue payment", enter the correct OTP (1111), and the payment will succeed.
-5. Check the Merchant Dashboard (/dashboard) — you will see the order transition to PAID and the Verified Recovered Revenue increase.
+Payment failures happen for many reasons: temporary banking issues, timeouts, network problems, or an unsuccessful payment attempt.
 
-Test Card Details:
-Card: 4100 2800 0000 1007
-Expiry: 12/30
-CVV: 123
-OTP (Success): 1111
-OTP (Failure): 0000
+In a normal checkout flow, one failed payment can interrupt the entire purchase and increase the chance of customer drop-off.
 
-API Endpoints:
-POST /api/orders/create — Create a new order
-GET /api/orders/ — Fetch all orders (Dashboard)
-GET /api/orders/:id — Fetch a single order (Polling)
-POST /api/orders/create-payment-link — Generate Razorpay Payment Link
-POST /api/webhooks/razorpay — Razorpay webhook handler (Signature verification + Dedupe)
+The customer may still want the product, but the merchant can lose the order simply because the first payment attempt did not succeed.
 
-Why This Matters:
-Most systems try to retry a payment. ResQ recovers the purchase.
-✅ For Customers: No more starting over. The purchase stays alive.
-✅ For Merchants: Inventory is protected. Revenue is verified.
-✅ For Developers: Clean state machine, secure webhooks, and a full audit trail.
+ResQ treats the **purchase journey** as the unit of recovery instead of treating every payment attempt as an isolated transaction.
 
-GitHub: https://github.com/abhinaybhuvanesh/ResQ
+---
 
-Keep the purchase alive.
+## What ResQ Does
+
+When a customer starts a purchase:
+
+1. ResQ creates and tracks the order.
+2. The customer is redirected to Razorpay Test Mode for payment.
+3. Razorpay sends payment events to the ResQ backend through webhooks.
+4. If the payment succeeds, the order becomes `PAID`.
+5. If the payment fails, the same order moves to `RECOVERY_ACTIVE`.
+6. A controlled recovery window starts.
+7. The customer can retry the payment without creating a completely new purchase journey.
+8. Once Razorpay confirms the successful retry, the same order is updated to `PAID`.
+9. The merchant dashboard reflects the updated order and payment state.
+
+The recovery depends on verified backend payment events rather than only on what the frontend displays.
+
+---
+
+## Core Idea
+
+> Recover the purchase journey, not just the failed transaction.
+
+ResQ keeps the order state alive during recovery so that a temporary payment failure does not immediately destroy purchase intent.
+
+The system is designed around three principles:
+
+- **Payment truth comes from Razorpay**
+- **Recovery is bounded and state-driven**
+- **Every important transition is traceable**
+
+---
+
+## Demo Flow
+
+### Successful Payment
+
+```text
+Customer Checkout
+      ↓
+Order Created
+      ↓
+Razorpay Payment
+      ↓
+payment.captured
+      ↓
+PAID
+      ↓
+MongoDB + Merchant Dashboard Updated
