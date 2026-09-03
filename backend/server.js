@@ -25,9 +25,9 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 app.get('/', (req, res) => {
-  res.send('🚀 ResQ Backend is running...');
+  res.send('ResQ Backend is running...');
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 ResQ Server running on http://localhost:${PORT}`);
+  console.log(`ResQ Server running on http://localhost:${PORT}`);
 });
